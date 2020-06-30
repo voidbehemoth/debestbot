@@ -1,0 +1,30 @@
+{
+    "prefix": "~",
+    "commands": {
+        "help [name of command]": "Retrieves a list of all commands & other useful information.",
+        "rating [username & tag]": "Retrieves the user's rating. Will enter the user into the database if not already.",
+        "match <winner username & tag> <loser username & tag>": "Records the results of a match into the database. Will enter the user into the database if not already.",
+        "winrate [username & tag]": "Retrieves the user's winrate. Will enter the user into the database if not already.",
+        "matchmake": "Will initiate the matchmaking process in this channel."
+    },
+    "secrets": {
+        "set [username & tag] <value>": "Sets a user's rating to a specified value. Not specifying will default to affecting the sender of the message only. For Dev user only.",
+        "reset [username & tag or the word 'global' (without parenthesis)]": "Resets a user's rating or the entire database if given the option. Not specifying will default to affecting the sender of the message only. For Dev use only.",
+        "undo [username & tag] [number of undos to execute]": "(WIP do not test) Undoes the last x change(s) to the user's rating. Not specifying will default to affecting the sender of the message only. Ajusts various other variables in the process. For Dev use only.",
+        "purge [username & tag] [number of purges to execute]": "(WIP do not test) Purges the history of a user x times. Not specifying will default to affecting the sender of the message only. Ajusts various other variables in the process. For Dev use only.",
+        "config [component] [value]": "(WIP do not test) Will query either a specific or all components in the server's config. If a value is specified it will set the component to that value. For Dev use only."
+    },
+    "components": {
+        "rating": "Whether or not to use the rating system. (Default: TRUE).",
+        "matchmaker": "Whether or not to use the matchmaking system. (Default: TRUE).",
+        "min_players": "How many players are required to play this game. (Default: 2)",
+        "max_players": "The maximum number of players able to play in one game. (Default: 2)",
+        "match_wait": "How many minutes the bot will wait for a match with the matchmaker. (Default: 5)"
+    },
+    "types": {
+        "match": ["winner", "loser"],
+        "set": ["user", "pre_rating", "post_rating"],
+        "reset": ["global", "user", "rating", "results"],
+        "config": ["user", "changes"]
+    }
+}
