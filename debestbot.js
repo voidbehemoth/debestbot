@@ -168,7 +168,7 @@ client.on('message', async msg => {
         
         
         // Formatting
-        var mes = "> **<> are mandatory and [] are optional**\n";
+        msg.channel.send("> :information_source: **<> are mandatory and [] are optional** :information_source:\n");
 
 
         if (!all) {
@@ -183,8 +183,7 @@ client.on('message', async msg => {
             var isCommand = (c != null && c != undefined);
             
             if (isCommand || (msg.member.hasPermission("ADMINISTRATOR") && isSecret)) {
-                mes = mes + `> **${prefix + (isSecret ? s : c)}:** ${isSecret ? "(DEV)" : ""} ${(isSecret) ? secrets[s] : commands[c]}`;
-                msg.channel.send(mes);
+                msg.channel.send(`> ${isSecret ? ":cyclone:" : ":globe_with_meridians:"} **${prefix + (isSecret ? s : c)}:** ${isSecret ? "(DEV)" : ""} ${(isSecret) ? secrets[s] : commands[c]}`);
             } else {
                 msg.channel.send("Invalid syntax. Try: `~help`.");
             }
@@ -193,17 +192,15 @@ client.on('message', async msg => {
 
         // Normal commands
         for (const com in commands) {
-            mes = mes + `> **${prefix + com}:** ${commands[com]}\n`;
+            msg.channel.send(`> :globe_with_meridians: **${prefix + com}**\n>    ${commands[com]}`);
         }
 
         // Secret commands
         if (msg.member.hasPermission("ADMINISTRATOR")) {
             for (const com in secrets) {
-                mes = mes + `> **${prefix + com}:** (DEV) ${secrets[com]}\n`;
+                msg.channel.send(`> :cyclone: **${prefix + com}:** (DEV)\n>    ${secrets[com]}`);
             } 
         }
-
-        msg.channel.send(mes);
     // Rating command
 	} else if (command === 'rating' && formatted(msg, args, 0, 1)) {
         

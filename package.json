@@ -10,8 +10,6 @@
   "license": "ISC",
   "dependencies": {
     "discord.js": "^11.4.2",
-    "ffmpeg": "0.0.4",
-    "get-rhymes": "^2.0.0",
     "keyv": "^4.0.1",
     "lazy": "^1.0.11",
     "node-opus": "^0.3.1",
