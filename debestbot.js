@@ -18,11 +18,10 @@ var servers = {};
 function registerServer(msg) {
     servers[msg.guild.id] = {
         "config": {
-            "rating": true,
-            "matchmaker": true,
-            "min_players": 2,
-            "max_players": 2,
-            "match_wait": 5
+            "starting_rating": 1000,
+            "max_rating": -1,
+            "history": true,
+            "winrate": true
         },
         "users": {},
         "actions": []
@@ -36,7 +35,7 @@ function registerUser(msg, user, rating, results = { wins: 0, losses: 0 }) {
         // Your rating... cannot go beneath 1000.
         "rating": rating,
         // Your match results.
-        "results": results
+        "results": (servers[msg.guild.id].config.winRate) ? results : undefined
     }
 }
 
@@ -116,7 +115,7 @@ function getLosses(msg, user) {
 
 // Calculates the win-loss ratio of a user
 // user: GuildMember
-function getWinRate(msg, user, results = false) {
+function getWinRate(msg, user) {
     var a = getWins(msg, user);
     var b = getLosses(msg, user);
 
@@ -168,7 +167,7 @@ client.on("message", async msg => {
         
         
         // Formatting
-        msg.channel.send("> :information_source: **<> are mandatory and [] are optional** :information_source:\n");
+        m = "> :information_source: **<> are mandatory and [] are optional** :information_source:";
 
 
         if (!all) {
@@ -183,22 +182,33 @@ client.on("message", async msg => {
             var isCommand = (c != null && c != undefined);
             
             if (isCommand || (msg.member.hasPermission("ADMINISTRATOR") && isSecret)) {
-                msg.channel.send(`> ${isSecret ? ":cyclone:" : ":globe_with_meridians:"} **${prefix + (isSecret ? s : c)}:** ${isSecret ? "(DEV)" : ""} ${(isSecret) ? secrets[s] : commands[c]}`);
+                if ((c != "winrate" || servers[msg.guild.id].config.winRate) && (s != "undo" || servers[msg.guild.id].config.history)) {
+                    msg.channel.send(m);
+                    msg.channel.send(`> ${isSecret ? ":cyclone:" : ":globe_with_meridians:"} **${prefix + (isSecret ? s : c)}:** ${isSecret ? "(DEV)" : ""} ${(isSecret) ? secrets[s] : commands[c]}`);
+                } else {
+                    msg.channel.send("Invalid syntax. Try: `~help`.");
+                }
             } else {
                 msg.channel.send("Invalid syntax. Try: `~help`.");
             }
             return;
         }
 
+        msg.channel.send(m);
+
         // Normal commands
         for (const com in commands) {
-            msg.channel.send(`> :globe_with_meridians: **${prefix + com}**\n>    ${commands[com]}`);
+            if (com != "winrate [username & tag]" || servers[msg.guild.id].config.winRate) {
+                msg.channel.send(`> :globe_with_meridians: **${prefix + com}**\n>    ${commands[com]}`);
+            }
         }
 
         // Secret commands
         if (msg.member.hasPermission("ADMINISTRATOR")) {
             for (const com in secrets) {
-                msg.channel.send(`> :cyclone: **${prefix + com}:** (DEV)\n>    ${secrets[com]}`);
+                if (com != "undo [username & tag] [number of undos to execute]" || servers[msg.guild.id].config.history) {
+                    msg.channel.send(`> :cyclone: **${prefix + com}:** (DEV)\n>    ${secrets[com]}`);
+                }
             } 
         }
     // Rating command
@@ -232,8 +242,10 @@ client.on("message", async msg => {
             const rating2 = getRating(msg, mentions[1].tag); // The losing player
 
             // Adjusts win and loss counts
-            servers[msg.guild.id].users[mentions[0].tag].results.wins += 1;
-            servers[msg.guild.id].users[mentions[1].tag].results.losses += 1;
+            if (servers[msg.guild.id].config.winRate) {
+                servers[msg.guild.id].users[mentions[0].tag].results.wins += 1;
+                servers[msg.guild.id].users[mentions[1].tag].results.losses += 1;
+            }
             
             // Calculates 'probability' of both players winning
             const P1 = 1.0 / (1.0 + Math.pow(10, ((rating2 - rating1) / 400))); 
@@ -274,18 +286,20 @@ client.on("message", async msg => {
             servers[msg.guild.id].users[mentions[0].tag]["rating"] = newRating1;
             servers[msg.guild.id].users[mentions[1].tag]["rating"] = newRating2;
 
-            registerAction(msg, msg.member.user.tag, "match", {
-                "winner": {
-                    "user": mentions[0].tag,
-                    "pre_rating": rating1,
-                    "post_rating": newRating1
-                },
-                "loser": {
-                    "user": mentions[1].tag,
-                    "pre_rating": rating2,
-                    "post_rating": newRating2
-                },
-            });
+            if (servers[msg.guild.id].config.history) {
+                registerAction(msg, msg.member.user.tag, "match", {
+                    "winner": {
+                        "user": mentions[0].tag,
+                        "pre_rating": rating1,
+                        "post_rating": newRating1
+                    },
+                    "loser": {
+                        "user": mentions[1].tag,
+                        "pre_rating": rating2,
+                        "post_rating": newRating2
+                    },
+                });
+            }
 
             msg.channel.send(`> **Match recorded!**\n> ${mentions[0].username} **(winner)**\n> **Old Rating:** ${rating1}\n> New Rating: ${newRating1}\n> ${mentions[1].username} **(loser)**\n> **Old Rating:** ${rating2}\n> New Rating: ${newRating2}`);
         } else {
@@ -319,11 +333,13 @@ client.on("message", async msg => {
         // Updates the rating
         servers[msg.guild.id].users[self ? msg.member.user.tag : mentions.tag].rating = newRating;
 
-        registerAction(msg, msg.member.user.tag, "set", {
-            "user": self ? msg.member.user.tag : mentions.tag,
-            "pre_rating": rating,
-            "post_rating": newRating
-        });
+        if (servers[msg.guild.id].config.history) {
+            registerAction(msg, msg.member.user.tag, "set", {
+                "user": self ? msg.member.user.tag : mentions.tag,
+                "pre_rating": rating,
+                "post_rating": newRating
+            });
+        }
 
         msg.channel.send(`${self ? "Your" : mentions.username + "'s"} rating has been set to ${newRating}`);
     
@@ -336,12 +352,14 @@ client.on("message", async msg => {
         // Whether there is not a mention AND the keyword 'global' is included
         const global = self ? false : (args[0] === "global");
 
-        registerAction(msg, msg.member.user.tag, "reset", {
-            "global": global,
-            "user": self ? msg.member.user.tag : global ? null : mentions.tag,
-            "rating": global ? null : getRating(msg, self ? msg.member.user.tag : mentions.tag),
-            "results": global ? null : servers[msg.guild.id].users[self ? msg.member.user.tag : mentions.tag].results
-        });
+        if (servers[msg.guild.id].config.history) {
+            registerAction(msg, msg.member.user.tag, "reset", {
+                "global": global,
+                "user": self ? msg.member.user.tag : global ? null : mentions.tag,
+                "rating": global ? null : getRating(msg, self ? msg.member.user.tag : mentions.tag),
+                "results": global ? null : servers[msg.guild.id].users[self ? msg.member.user.tag : mentions.tag].results
+            });
+        }
 
         // Resets the database if global is true
         servers[msg.guild.id].users = global ? {} : servers[msg.guild.id].users;
@@ -358,7 +376,7 @@ client.on("message", async msg => {
         // An overly complicated response command that I made because I enjoy simping for the ternary operator
         msg.channel.send(`${self ? "You" : global ? "The database" : mentions.username} ${self ? "have" : "has"} had ${self ? "your" : global ? "all" : "their"} ${global ? "ratings" : "rating"} reset to 1000`);
     // Winrate command
-    } else if(command === "winrate" && formatted(msg, args, 0, 1)){
+    } else if(command === "winrate" && formatted(msg, args, 0, 1) && servers[msg.guild.id].config.winrate){
         // Gets 'the' mention
         const mentions = msg.mentions.users.first();
 
@@ -374,7 +392,7 @@ client.on("message", async msg => {
         }
 
         msg.channel.send(`${(self) ? "Your" : mentions.username + "'s"} win rate is ${winRate.toFixed(2)}%`);
-   } else if (command === "undo" && formatted(msg, args, 0, 2) && msg.member.hasPermission("ADMINISTRATOR")) {
+   } else if (command === "undo" && formatted(msg, args, 0, 2) && msg.member.hasPermission("ADMINISTRATOR") && servers[msg.guild.id].config.history) {
 
 
         // Gets 'the' mention
