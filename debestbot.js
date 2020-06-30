@@ -67,7 +67,7 @@ function validateOptions(type, options) {
 
 function registerAction(msg, user, type, options) {
     if (servers[msg.guild.id] === undefined) registerServer(msg);
-    if (servers[msg.guild.id].users[user] === undefined) registerUser(msg, user, 1000);
+    if (servers[msg.guild.id].users[user] === undefined) registerUser(msg, user, servers[msg.guild.id].config.starting_rating);
 
     if (!validateOptions(type, options)) {
         msg.channel.send("Encountered an issue registering an action! Please report this to `VoidBehemoth#9503`, `BunsenBurn#6467`, or `RyanMych (Shulk tiem)#0847`.");
@@ -88,7 +88,7 @@ function registerAction(msg, user, type, options) {
 function getRating(msg, user) {
     // Initializes the user in the database if not already.
     if (servers[msg.guild.id] === undefined) registerServer(msg);
-    if (servers[msg.guild.id].users[user] === undefined) registerUser(msg, user, 1000);
+    if (servers[msg.guild.id].users[user] === undefined) registerUser(msg, user, servers[msg.guild.id].config.starting_rating);
 
     return servers[msg.guild.id].users[user].rating;
 }
@@ -98,7 +98,7 @@ function getRating(msg, user) {
 function getWins(msg, user) {
     if (servers[msg.guild.id] === undefined) registerServer(msg);
     // Initializes the user in the database if not already.
-    if (servers[msg.guild.id].users[user] === undefined) registerUser(msg, user, 1000);
+    if (servers[msg.guild.id].users[user] === undefined) registerUser(msg, user, servers[msg.guild.id].config.starting_rating);
 
     return servers[msg.guild.id].users[user].results.wins;
 }
@@ -108,7 +108,7 @@ function getWins(msg, user) {
 function getLosses(msg, user) {
     if (servers[msg.guild.id] === undefined) registerServer(msg);
     // Initializes the user in the database if not already.
-    if (servers[msg.guild.id].users[user] === undefined) registerUser(msg, user, 1000);
+    if (servers[msg.guild.id].users[user] === undefined) registerUser(msg, user, servers[msg.guild.id].config.starting_rating);
 
     return servers[msg.guild.id].users[user].results.losses;
 }
@@ -260,13 +260,13 @@ client.on("message", async msg => {
             var mult2;
 
             // Sets the multipliers
-            if (rating1 < 1100) {
-                mult1 = 20 + (20 * .012 * (1050 - rating1));
+            if (rating1 < (servers[msg.guild.id].config.starting_rating + 100)) {
+                mult1 = 20 + (20 * .012 * ((servers[msg.guild.id].config.starting_rating + 50) - rating1));
             } else {
                 mult1 = 20;
             }
-            if (rating2 < 1100) {
-                mult2 = 20 - (20 * .012 * (1050 - rating2));
+            if (rating2 < (servers[msg.guild.id].config.starting_rating + 100)) {
+                mult2 = 20 - (20 * .012 * ((servers[msg.guild.id].config.starting_rating + 50) - rating2));
             } else {
                 mult2 = 20;
             }
@@ -279,8 +279,16 @@ client.on("message", async msg => {
             newRating2 = Number(newRating2.toFixed(2));
             
             // Ensures that each player's rating doesn't drop below 1000
-            newRating1 = (newRating1 < 1000) ? (newRating1 + (1000 - newRating1)) : newRating1;
-            newRating2 = (newRating2 < 1000) ? (newRating2 + (1000 - newRating2)) : newRating2;
+            newRating1 = (newRating1 < servers[msg.guild.id].config.starting_rating) ? servers[msg.guild.id].config.starting_rating : newRating1;
+            newRating2 = (newRating2 < servers[msg.guild.id].config.starting_rating) ? servers[msg.guild.id].config.starting_rating : newRating2;
+            
+            var max = servers[msg.guild.id].config.max_rating;
+
+            if (max < 0) max = Infinity;
+
+            // Ensures that each player's rating doesn't go above the maximum
+            newRating1 = (newRating1 > max) ? max : newRating1;
+            newRating2 = (newRating2 > max) ? max : newRating2;
 
             // Updates the rating
             servers[msg.guild.id].users[mentions[0].tag]["rating"] = newRating1;
@@ -328,7 +336,13 @@ client.on("message", async msg => {
         newRating = Number(newRating.toFixed(2));
 
         // Ensures that the player's rating doesn't drop below 1000
-        newRating = (newRating < 1000) ? (newRating + (1000 - newRating)) : newRating;
+        newRating = (newRating < servers[msg.guild.id].config.starting_rating) ? servers[msg.guild.id].config.starting_rating : newRating;
+
+        var max = servers[msg.guild.id].config.max_rating;
+
+        if (max < 0) max = Infinity;
+
+        newRating = (newRating > max) ? max : newRating;
 
         // Updates the rating
         servers[msg.guild.id].users[self ? msg.member.user.tag : mentions.tag].rating = newRating;
@@ -374,7 +388,7 @@ client.on("message", async msg => {
         servers[msg.guild.id].users[self ? msg.member.user.tag : global ? null : mentions.tag] = undefined;
 
         // An overly complicated response command that I made because I enjoy simping for the ternary operator
-        msg.channel.send(`${self ? "You" : global ? "The database" : mentions.username} ${self ? "have" : "has"} had ${self ? "your" : global ? "all" : "their"} ${global ? "ratings" : "rating"} reset to 1000`);
+        msg.channel.send(`${self ? "You" : global ? "The database" : mentions.username} ${self ? "have" : "has"} had ${self ? "your" : global ? "all" : "their"} ${global ? "ratings" : "rating"} reset to ${servers[msg.guild.id].config.starting_rating}`);
     // Winrate command
     } else if(command === "winrate" && formatted(msg, args, 0, 1) && servers[msg.guild.id].config.winrate){
         // Gets 'the' mention
@@ -497,7 +511,7 @@ client.on("message", async msg => {
                     registerUser(msg, action.options.user, action.options.rating, action.options.results);
 
                     updated_users[action.options.user] = {
-                        "old_rating": 1000,
+                        "old_rating": servers[msg.guild.id].config.starting_rating,
                         "new_rating": getRating(msg, action.options.user),
                         "old_wl": 0,
                         "new_wl": getWinRate(msg, action.options.user)
