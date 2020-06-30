@@ -6,8 +6,8 @@ The term client is used to refer to the Bot User.
 The term user is used to refer to the user who sent the message in question.
 */
 
-const Discord = require('discord.js');
-const { prefix, commands, secrets, components, types } = require('./config.json');
+const Discord = require("discord.js");
+const { prefix, commands, secrets, components, types } = require("./config.json");
 const { token } = require("./token.json");
 
 const client = new Discord.Client();
@@ -139,19 +139,19 @@ function formatted(msg, args, min, max) {
 }
 
 // Called automatically when client connects to discord
-client.on('ready', () => {
+client.on("ready", () => {
     // Prints to console
     console.log(`Logged in as ${client.user.tag}!`);
     // Sets the activity of the client to prompt the user to use the 'help' command
     client.user.setActivity(`${prefix}help`, {
-            type: 'PLAYING'
+            type: "WATCHING"
         })
         .then(presence => console.log(`Activity set to ${presence.game ? presence.game.name : 'none'}`))
         .catch(console.error);
 });
 
 // Called automatically when client receives a message from discord
-client.on('message', async msg => {
+client.on("message", async msg => {
     // Exits process if the user is a bot, is not in a server, is discord itself, or did not send the message with the designated prefix.
     if (!msg.content.startsWith(prefix) || msg.guild === null || msg.system || msg.author.bot) return;
 
@@ -161,7 +161,7 @@ client.on('message', async msg => {
     const command = args.shift().toLowerCase();
     
     // Help command
-    if (command === 'help' && formatted(msg, args, 0, 1)) {
+    if (command === "help" && formatted(msg, args, 0, 1)) {
 
         const all = (args.length === 0);
 
@@ -202,7 +202,7 @@ client.on('message', async msg => {
             } 
         }
     // Rating command
-	} else if (command === 'rating' && formatted(msg, args, 0, 1)) {
+	} else if (command === "rating" && formatted(msg, args, 0, 1)) {
         
         // Gets 'the' mention
         const mentions = msg.mentions.users.first();
