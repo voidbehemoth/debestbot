@@ -32,10 +32,11 @@ function registerServer(msg) {
 // user: GuildMember, rating: Integer, mult: Integer
 function registerUser(msg, user, rating, results = { wins: 0, losses: 0 }) {
     servers[msg.guild.id].users[user] = {
+        "tag": user,
         // Your rating... cannot go beneath 1000.
         "rating": rating,
         // Your match results.
-        "results": (servers[msg.guild.id].config.winRate) ? results : undefined
+        "results": (servers[msg.guild.id].config.winrate) ? results : undefined
     }
 }
 
@@ -123,6 +124,30 @@ function getWinRate(msg, user) {
     return 100 * (a / ((a + b === 0) ? 1 : (a + b)));
 }
 
+function getTopUsers(msg, cat, num) {
+
+    if (cat != "rating" && cat != "winrate") return null;
+
+    const users = Object.values(servers[msg.guild.id].users);
+
+    const topcut = users.sort((a, b) => {
+        return (a[(cat === "winrate") ? getWinRate(msg, a.tag) : cat] > b[(cat === "winrate") ? getWinRate(msg, b.tag) : cat]) ? -1 : 1;
+    });
+
+    if (topcut.length > num) {
+        while (topcut.length > num) {
+            topcut.pop();
+        }
+    }
+
+    for (const cut in topcut) {
+        if ((topcut[cut].results.wins + topcut[cut].results.losses) < 5) {
+            topcut.splice(cut, 1);
+        } else {
+            msg.channel.send(`${Number(cut) + 1}. ${topcut[cut].tag}: (${cat}) ${(cat === "winrate") ? getWinRate(msg, topcut[cut].tag) : getRating(msg, topcut[cut].tag)}${(cat === "winrate") ? "%" : ""}`);
+        }
+    }
+}
 
 // Confirms that the required number of arguments are used and alerts the user if otherwise.
 // msg: Message, args: an instantiation of the args[] variable, min: int, max: int
@@ -154,6 +179,8 @@ client.on("message", async msg => {
     // Exits process if the user is a bot, is not in a server, is discord itself, or did not send the message with the designated prefix.
     if (!msg.content.startsWith(prefix) || msg.guild === null || msg.system || msg.author.bot) return;
 
+    if (servers[msg.guild.id] === null || servers[msg.guild.id] === undefined) registerServer(msg);
+
     // Converts the message to an array.
     const args = msg.content.slice(prefix.length).split(/ +/);
     // Seperates the command itself.
@@ -163,18 +190,16 @@ client.on("message", async msg => {
     if (command === "help" && formatted(msg, args, 0, 1)) {
 
         const all = (args.length === 0);
-
-        
         
         // Formatting
         m = "> :information_source: **<> are mandatory and [] are optional** :information_source:";
 
 
         if (!all) {
-            c = Object.keys(commands).find((v) => {
+            var c = Object.keys(commands).find((v) => {
                 return v.startsWith(args[0]);
             });
-            s = Object.keys(secrets).find((v) => {
+            var s = Object.keys(secrets).find((v) => {
                 return v.startsWith(args[0]);
             });
 
@@ -182,7 +207,7 @@ client.on("message", async msg => {
             var isCommand = (c != null && c != undefined);
             
             if (isCommand || (msg.member.hasPermission("ADMINISTRATOR") && isSecret)) {
-                if ((c != "winrate" || servers[msg.guild.id].config.winRate) && (s != "undo" || servers[msg.guild.id].config.history)) {
+                if ((c != "winrate" || servers[msg.guild.id].config.winrate) && (s != "undo" || servers[msg.guild.id].config.history)) {
                     msg.channel.send(m);
                     msg.channel.send(`> ${isSecret ? ":cyclone:" : ":globe_with_meridians:"} **${prefix + (isSecret ? s : c)}:** ${isSecret ? "(DEV)" : ""} ${(isSecret) ? secrets[s] : commands[c]}`);
                 } else {
@@ -198,7 +223,7 @@ client.on("message", async msg => {
 
         // Normal commands
         for (const com in commands) {
-            if (com != "winrate [username & tag]" || servers[msg.guild.id].config.winRate) {
+            if (com != "winrate [username & tag]" || servers[msg.guild.id].config.winrate) {
                 msg.channel.send(`> :globe_with_meridians: **${prefix + com}**\n>    ${commands[com]}`);
             }
         }
@@ -242,7 +267,7 @@ client.on("message", async msg => {
             const rating2 = getRating(msg, mentions[1].tag); // The losing player
 
             // Adjusts win and loss counts
-            if (servers[msg.guild.id].config.winRate) {
+            if (servers[msg.guild.id].config.winrate) {
                 servers[msg.guild.id].users[mentions[0].tag].results.wins += 1;
                 servers[msg.guild.id].users[mentions[1].tag].results.losses += 1;
             }
@@ -397,7 +422,7 @@ client.on("message", async msg => {
         // Whether there is not a mention
         const self = (args.length === 0);
 
-        const winRate = getWinRate(msg, self ? msg.member.user.tag : mentions.tag);
+        const winrate = getWinRate(msg, self ? msg.member.user.tag : mentions.tag);
 
         // Queries various syntax components
         if (!self && mentions === undefined) {
@@ -405,9 +430,8 @@ client.on("message", async msg => {
             return;
         }
 
-        msg.channel.send(`${(self) ? "Your" : mentions.username + "'s"} win rate is ${winRate.toFixed(2)}%`);
-   } else if (command === "undo" && formatted(msg, args, 0, 2) && msg.member.hasPermission("ADMINISTRATOR") && servers[msg.guild.id].config.history) {
-
+        msg.channel.send(`${(self) ? "Your" : mentions.username + "'s"} win rate is ${winrate.toFixed(2)}%`);
+    } else if (command === "undo" && formatted(msg, args, 0, 2) && msg.member.hasPermission("ADMINISTRATOR") && servers[msg.guild.id].config.history) {
 
         // Gets 'the' mention
         const mentions = msg.mentions.users.first();
@@ -531,6 +555,99 @@ client.on("message", async msg => {
         }
         
         msg.channel.send(mes);
+   } else if (command === "config" && formatted(msg, args, 0, 2) && msg.member.hasPermission("ADMINISTRATOR")) {
+
+        if (args.length === 0) {
+            for (const comp in components) {
+                msg.channel.send(`> :star: **${comp}**\n>    ${components[comp]}`);
+            }
+            return;
+        }
+
+        var comp = Object.keys(components).find((v) => {
+            return v === args[0];
+        });
+
+        if (comp === null || comp === undefined) {
+            msg.channel.send("Invalid syntax. Try: `~help`.");
+            return;
+        }
+
+        if (args.length === 1) {            
+            msg.channel.send(`> :star: **${comp}**\n>    ${components[comp]}`);
+            return;
+        }
+
+        if (args[1] === "reset") {
+            switch (comp) {
+                case "starting_rating":
+                    servers[msg.guild.id].config.starting_rating = 1000;
+                    msg.channel.send(`${comp} has been set to 1000`);
+                    break;
+                case "max_rating":
+                    servers[msg.guild.id].config.max_rating = -1;
+                    msg.channel.send(`${comp} has been set to -1`);
+                    break;
+                case "history":
+                    servers[msg.guild.id].config.history = true;
+                    msg.channel.send(`${comp} has been set to true`);
+                    break;
+                case "winrate":
+                    servers[msg.guild.id].config.winrate = true;
+                    msg.channel.send(`${comp} has been set to true`);
+                    break;
+                default:
+                    msg.channel.send("Invalid syntax. Try: `~help`.");
+                    break;
+            }
+            return;
+        }
+
+        const num = Number(args[1]);
+        const bool = (args[1] === "true") ? true : (args[1] === "false") ? false : "not_a_boolean";
+
+        if (!Number.isInteger(num)) {
+            if (typeof bool === "boolean") {
+                servers[msg.guild.id].config[comp] = bool;
+                msg.channel.send(`${comp} has been set to ${bool}`);
+                return;
+            }
+            msg.channel.send("Invalid syntax. Try: `~help`.");
+            return;
+        }
+
+        servers[msg.guild.id].config[comp] = num;
+
+        msg.channel.send(`${comp} has been set to ${num}`);
+   } else if (command === "top" && formatted(msg, args, 0, 2)) {
+       if (args.length === 0) {
+           getTopUsers(msg, "rating", 10);
+           return;
+       }
+
+       if (args.length === 1) {
+
+            const num = Number(args[0]);
+
+            if (Number.isInteger(num) && ((-1 * num) < 0) && Number.isFinite(num)) {
+                getTopUsers(msg, "rating", num);
+            } else if (args[0] === "top" || args[0] === "winrate") {
+                getTopUsers(msg, args[0], 10);
+            } else {
+                msg.channel.send("Invalid syntax. Try: `~help`.");
+            }
+
+            return;
+           
+       }
+
+       const num = Number(args[1]);
+
+       if (!(Number.isInteger(num) && ((-1 * num) < 0) && Number.isFinite(num) && (args[0] === "top" || args[0] === "winrate"))) {
+           msg.channel.send("Invalid syntax. Try `~help`");
+       }
+
+       getTopUsers(msg, args[0], num);
    }
 });
 

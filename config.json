@@ -4,11 +4,12 @@
         "help [name of command]": "Retrieves a list of all commands & other useful information.",
         "rating [username & tag]": "Retrieves the user's rating. Will enter the user into the database if not already.",
         "match <winner username & tag> <loser username & tag>": "Records the results of a match into the database. Will enter the user into the database if not already.",
-        "winrate [username & tag]": "Retrieves the user's winrate. Will enter the user into the database if not already."
+        "winrate [username & tag]": "Retrieves the user's winrate. Will enter the user into the database if not already.",
+        "top ['rating' or 'winrate' (without quotation marks] [how many users to display]": "Retrieves the top users from the category of choice (category will default to rating). The number of users to retrieve can also be specified (defaults to 10)."
         },
     "secrets": {
         "set [username & tag] <value>": "Sets a user's rating to a specified value. Not specifying will default to affecting the sender of the message only. For Dev user only.",
-        "reset [username & tag or the word 'global' (without parenthesis)]": "Resets a user's rating or the entire database if given the option. Not specifying will default to affecting the sender of the message only. For Dev use only.",
+        "reset [username & tag or the word 'global' (without quotation marks)]": "Resets a user's rating or the entire database if given the option. Not specifying will default to affecting the sender of the message only. For Dev use only.",
         "undo [username & tag] [number of undos to execute]": "(WIP do not test) Undoes the last x change(s) to the user's rating. Not specifying will default to affecting the sender of the message only. Ajusts various other variables in the process. For Dev use only.",
         "config [component] [value]": "(WIP do not test) Will query either a specific or all components in the server's config. If a value is specified it will set the component to that value. For Dev use only."
     },
