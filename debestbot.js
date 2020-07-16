@@ -7,131 +7,180 @@ The term user is used to refer to the user who sent the message in question.
 */
 
 const Discord = require("discord.js");
+
+const mongoose = require("mongoose");
+
 const { prefix, commands, secrets, components, types } = require("./config.json");
 const { token } = require("./token.json");
+const { url } = require("./url.json");
+const Server = require("./models/Server.model");
 
 const client = new Discord.Client();
 
-// TEMPORARY OBJECT IN PLACE OF DATABASE
-var servers = {};
+mongoose.connect(url, {useNewUrlParser: true, useUnifiedTopology: true});
+mongoose.set('debug', true)
 
-function registerServer(msg) {
-    servers[msg.guild.id] = {
-        "config": {
+const botdb = mongoose.connection;
+botdb.on("error", console.error.bind(console, "connection error:"));
+botdb.once("open", function() { console.log("Hacker voice: I'm in") });
+
+async function registerServer(msg) {
+    return await Server.create({
+        id: msg.guild.id,
+        config: {
             "starting_rating": 1000,
             "max_rating": -1,
             "history": true,
             "winrate": true
         },
-        "users": {},
-        "actions": []
-    }
+        users: [],
+        actions: []
+    }).catch((err) => { console.log(err) });
+}
+
+async function getConfig(msg, component = null) {
+    var config = (await Server.findOne({id: msg.guild.id})).config;
+    return (component === null) ? config : config[component];
+}
+
+async function getUsers(msg) {
+    var users = (await Server.findOne({id: msg.guild.id})).users;
+    return users;
+}
+
+async function findUserIndex (msg, user, users) {
+    return await users.findIndex((v) => { return (v.tag === user) });
+}
+
+async function setUsers(msg, value) {
+    var server = await Server.findOne({id: msg.guild.id});
+
+    server.users = value;
+
+    server.save();
+}
+
+async function userExists(msg, user) {
+    return (await (getUsers(msg)).find((v) => {
+        return (user.tag === user);
+    }) != undefined);
 }
 
 // Initializes a new user in the database. Not for use outside of accessor functions.
 // user: GuildMember, rating: Integer, mult: Integer
-function registerUser(msg, user, rating, results = { wins: 0, losses: 0 }) {
-    servers[msg.guild.id].users[user] = {
-        "tag": user,
+async function registerUser(msg, user, rating, results = { wins: 0, losses: 0 }) {
+    var server = await Server.findOne({id: msg.guild.id});
+    var user = {
+        tag: user,
         // Your rating... cannot go beneath 1000.
-        "rating": rating,
+        rating: rating,
         // Your match results.
-        "results": (servers[msg.guild.id].config.winrate) ? results : undefined
-    }
+        results: await getConfig(msg, "winrate") ? results : undefined
+    };
+
+    server.users.push(user);
+    await server.save();
+
+    return user;
 }
 
-function isValidType(type) {
-    return (Object.keys(types).find((v) => {
-        return v === type;
-    }) === type);
-};
+async function registerAction(msg, type, user, users, config, alt_params) {
+    var server = await Server.findOne({id: msg.guild.id});
 
-function isValidOption(type, option) {
-    if (!isValidType(type)) return false;
+    server.actions.push({
+        type: type,
+        user: user,
+        users: [],
+        config: [],
+        alt_params: []
+    });
 
-    return (types[type].find((v) => {
-        return v === option;
-    }) === option);
-}
-
-function validateOptions(type, options) {
-    if (!isValidType(type)) return false;
-
-    for (let i = 0; i < Object.keys(options).length; i++) {
-        if (!isValidOption(type, Object.keys(options)[i])) {
-            return false;
+    var len = ((server.actions.length - 1) < 0) ? 0 : server.actions.length - 1;
+    var new_action = server.actions[len];
+    
+    if (users != []) {
+        for (u in users) {
+            new_action.users.push(users[u]);
         }
     }
 
-    return true;
-}
-
-function registerAction(msg, user, type, options) {
-    if (servers[msg.guild.id] === undefined) registerServer(msg);
-    if (servers[msg.guild.id].users[user] === undefined) registerUser(msg, user, servers[msg.guild.id].config.starting_rating);
-
-    if (!validateOptions(type, options)) {
-        msg.channel.send("Encountered an issue registering an action! Please report this to `VoidBehemoth#9503`, `BunsenBurn#6467`, or `RyanMych (Shulk tiem)#0847`.");
-        return false;
+    if (config != []) {
+        for (c in config) {
+            new_action.config.push(config[c]);
+        }
     }
 
-    servers[msg.guild.id].actions.push({
-        "type": type,
-        "user": user,
-        "options": options
-    });
+    if (alt_params != []) {
+        for (a in alt_params) {
+            new_action.alt_params.push(alt_params[a]);
+        }
+    }
 
-    return true;
+    server.actions.set(len, new_action);
+
+    await server.save();
+
+    return server.actions[len];
+}
+
+async function getActions (msg) {
+    return (await Server.find({id: msg.guild.id})).actions;
+}
+
+async function setConfig(msg, component, value) {
+    var server = await Server.find({id: msg.guild.id});
+    server.config[component] = value;
+    config.save();
 }
 
 // accessor function to get rating from user
 // user: GuildMember
-function getRating(msg, user) {
-    // Initializes the user in the database if not already.
-    if (servers[msg.guild.id] === undefined) registerServer(msg);
-    if (servers[msg.guild.id].users[user] === undefined) registerUser(msg, user, servers[msg.guild.id].config.starting_rating);
-
-    return servers[msg.guild.id].users[user].rating;
+async function getRating(msg, user) {
+    return (await getUsers(msg)).find((v) => { return (user === v.tag) }).rating;
 }
 
 // accessor function to get number of wins from user
 // user: GuildMember
-function getWins(msg, user) {
-    if (servers[msg.guild.id] === undefined) registerServer(msg);
-    // Initializes the user in the database if not already.
-    if (servers[msg.guild.id].users[user] === undefined) registerUser(msg, user, servers[msg.guild.id].config.starting_rating);
-
-    return servers[msg.guild.id].users[user].results.wins;
+async function getWins(msg, user) {
+    if (!(getConfig(msg, "winrate"))) return null; 
+    return (await getUsers(msg)).find((v) => { return (user === v.tag) }).results.wins;
 }
 
 // accessor function to get number of losses from user
 // user: GuildMember
-function getLosses(msg, user) {
-    if (servers[msg.guild.id] === undefined) registerServer(msg);
-    // Initializes the user in the database if not already.
-    if (servers[msg.guild.id].users[user] === undefined) registerUser(msg, user, servers[msg.guild.id].config.starting_rating);
+async function getLosses(msg, user) {
+    if (!(getConfig(msg, "winrate"))) return null; 
+    return (await getUsers(msg)).find((v) => { return (user === v.tag) }).results.losses;
+}
 
-    return servers[msg.guild.id].users[user].results.losses;
+async function getResults(msg, user) {
+    if (!(getConfig(msg, "winrate"))) return null; 
+    return (await getUsers(msg)).find((v) => { return (user === v.tag) }).results;
 }
 
 // Calculates the win-loss ratio of a user
 // user: GuildMember
-function getWinRate(msg, user) {
-    var a = getWins(msg, user);
-    var b = getLosses(msg, user);
+async function getWinRate(msg, user, win, loss) {
+    if (!(await getConfig(msg, "winrate"))) return null; 
+
+    var a = (win === undefined) ? (await getWins(msg, user)) : win;
+    var b = (loss === undefined) ?  (await getLosses(msg, user)) : loss;
 
     // The Algorithm™
     return 100 * (a / ((a + b === 0) ? 1 : (a + b)));
 }
 
-function getTopUsers(msg, cat, num) {
+async function getTopUsers(msg, cat, num) {
 
     if (cat != "rating" && cat != "winrate") return null;
 
-    const users = Object.values(servers[msg.guild.id].users);
+    const users = await getUsers(msg);
 
-    const topcut = users.sort((a, b) => {
-        return (a[(cat === "winrate") ? getWinRate(msg, a.tag) : cat] > b[(cat === "winrate") ? getWinRate(msg, b.tag) : cat]) ? -1 : 1;
+    const topcut = users.sort(async (a, b) => {
+        var v1 = (cat === "winrate") ? (await getWinRate(msg, a.tag)) : a.rating;
+        var v2 = (cat === "winrate") ? (await getWinRate(msg, b.tag)) : b.rating;
+
+        return v1 - v2;
     });
 
     if (topcut.length > num) {
@@ -140,13 +189,62 @@ function getTopUsers(msg, cat, num) {
         }
     }
 
-    for (const cut in topcut) {
-        if ((topcut[cut].results.wins + topcut[cut].results.losses) < 5) {
-            topcut.splice(cut, 1);
+    for (let c = 0; c < topcut.length; c++) {
+        if ((topcut[c].results.wins + topcut[c].results.losses) < 5) {
+            topcut.splice(c, 1);
+            c--;
         } else {
-            msg.channel.send(`${Number(cut) + 1}. ${topcut[cut].tag}: (${cat}) ${(cat === "winrate") ? getWinRate(msg, topcut[cut].tag) : getRating(msg, topcut[cut].tag)}${(cat === "winrate") ? "%" : ""}`);
+            msg.channel.send(`${Number(c) + 1}. ${topcut[c].tag}: (${cat}) ${(cat === "winrate") ? (await getWinRate(msg, topcut[c].tag)) : (await getRating(msg, topcut[c].tag))}${(cat === "winrate") ? "%" : ""}`);
         }
     }
+    console.log(topcut)
+}
+
+async function setRating(msg, user, value) {
+    var server = await Server.findOne({id: msg.guild.id})
+
+    var index = await findUserIndex(msg, user, server.users);
+    console.log(index);
+
+    var new_rating = server.users[index];
+
+    new_rating.rating = value;
+
+    server.users.set(index, new_rating);
+
+    server.save();
+}
+
+async function setWins(msg, user, value) {
+    if (!(getConfig(msg, "winrate"))) return null; 
+
+    var server = await Server.findOne({id: msg.guild.id})
+
+    var index = await findUserIndex(msg, user, server.users);
+
+    var new_win = server.users[index];
+
+    new_win.results.wins = value;
+
+    server.users.set(index, new_win);
+
+    server.save();
+}
+
+async function setLosses(msg, user, value) {
+    if (!(getConfig(msg, "winrate"))) return null; 
+
+    var server = await Server.findOne({id: msg.guild.id})
+
+    var index = await findUserIndex(msg, user, server.users);
+
+    var new_loss = server.users[index];
+
+    new_loss.results.losses = value;
+
+    server.users.set(index, new_loss);
+
+    server.save();
 }
 
 // Confirms that the required number of arguments are used and alerts the user if otherwise.
@@ -167,10 +265,8 @@ client.on("ready", () => {
     // Prints to console
     console.log(`Logged in as ${client.user.tag}!`);
     // Sets the activity of the client to prompt the user to use the 'help' command
-    client.user.setActivity(`${prefix}help`, {
-            type: "WATCHING"
-        })
-        .then(presence => console.log(`Activity set to ${presence.game ? presence.game.name : 'none'}`))
+    client.user.setActivity(`${prefix}help`, { type: 'WATCHING' })
+        .then(presence => console.log(`Activity set to ${presence.activities[0].name}`))
         .catch(console.error);
 });
 
@@ -179,7 +275,21 @@ client.on("message", async msg => {
     // Exits process if the user is a bot, is not in a server, is discord itself, or did not send the message with the designated prefix.
     if (!msg.content.startsWith(prefix) || msg.guild === null || msg.system || msg.author.bot) return;
 
-    if (servers[msg.guild.id] === null || servers[msg.guild.id] === undefined) registerServer(msg);
+    
+    if (!(await Server.exists({id: msg.guild.id}))) {
+        await registerServer(msg);
+    }
+
+    const mentions = msg.mentions.members.array() || new Array();
+
+    mentions.push(msg.member);
+
+    for (user in mentions) {
+        if ((await Server.findOne({ id: msg.guild.id })).users.filter((v) => String(v.tag) === String(mentions[user].user.tag)).length < 1) {
+            var starting_rating = await getConfig(msg, "starting_rating");
+            await registerUser(msg, mentions[user].user.tag, starting_rating);
+        }
+    }
 
     // Converts the message to an array.
     const args = msg.content.slice(prefix.length).split(/ +/);
@@ -207,7 +317,7 @@ client.on("message", async msg => {
             var isCommand = (c != null && c != undefined);
             
             if (isCommand || (msg.member.hasPermission("ADMINISTRATOR") && isSecret)) {
-                if ((c != "winrate" || servers[msg.guild.id].config.winrate) && (s != "undo" || servers[msg.guild.id].config.history)) {
+                if ((c != "winrate" || getConfig(msg, "winrate")) && (s != "undo" || getConfig(msg, "history"))) {
                     msg.channel.send(m);
                     msg.channel.send(`> ${isSecret ? ":cyclone:" : ":globe_with_meridians:"} **${prefix + (isSecret ? s : c)}:** ${isSecret ? "(DEV)" : ""} ${(isSecret) ? secrets[s] : commands[c]}`);
                 } else {
@@ -223,7 +333,7 @@ client.on("message", async msg => {
 
         // Normal commands
         for (const com in commands) {
-            if (com != "winrate [username & tag]" || servers[msg.guild.id].config.winrate) {
+            if (com != "winrate [username & tag]" || getConfig(msg, "winrate")) {
                 msg.channel.send(`> :globe_with_meridians: **${prefix + com}**\n>    ${commands[com]}`);
             }
         }
@@ -231,7 +341,7 @@ client.on("message", async msg => {
         // Secret commands
         if (msg.member.hasPermission("ADMINISTRATOR")) {
             for (const com in secrets) {
-                if (com != "undo [username & tag] [number of undos to execute]" || servers[msg.guild.id].config.history) {
+                if (com != "undo [username & tag] [number of undos to execute]" || getConfig(msg, "history")) {
                     msg.channel.send(`> :cyclone: **${prefix + com}:** (DEV)\n>    ${secrets[com]}`);
                 }
             } 
@@ -245,7 +355,7 @@ client.on("message", async msg => {
         // Whether there is not a mention
         const self = (args.length === 0);
 
-        const rating = getRating(msg, self ? msg.member.user.tag : mentions.tag);
+        const rating = await getRating(msg, self ? msg.member.user.tag : mentions.tag);
 
         // Queries various syntax components
         if (!self && mentions === undefined) {
@@ -263,14 +373,20 @@ client.on("message", async msg => {
         if (mentions.length > 1) {
 
             // Gets rating of mentions
-            const rating1 = getRating(msg, mentions[0].tag); // The winning player
-            const rating2 = getRating(msg, mentions[1].tag); // The losing player
+            const rating1 = await getRating(msg, mentions[0].tag); // The winning player
+            const rating2 = await getRating(msg, mentions[1].tag); // The losing player
+
+            const res1 = await getResults(msg, mentions[0].tag);
+            const res2 = await getResults(msg, mentions[1].tag);
 
             // Adjusts win and loss counts
-            if (servers[msg.guild.id].config.winrate) {
-                servers[msg.guild.id].users[mentions[0].tag].results.wins += 1;
-                servers[msg.guild.id].users[mentions[1].tag].results.losses += 1;
+            if (getConfig(msg, "winrate")) {
+                setWins(msg,mentions[0].tag, ((await getWins(msg, mentions[0].tag)) + 1));
+                setLosses(msg,mentions[1].tag, ((await getLosses(msg, mentions[1].tag)) + 1));
             }
+
+            const newRes1 = await getResults(msg, mentions[0].tag);
+            const newRes2 = await getResults(msg, mentions[1].tag);
             
             // Calculates 'probability' of both players winning
             const P1 = 1.0 / (1.0 + Math.pow(10, ((rating2 - rating1) / 400))); 
@@ -284,14 +400,16 @@ client.on("message", async msg => {
             var mult1;
             var mult2;
 
+            const starting_rating = Number(await getConfig(msg, "starting_rating"));
+
             // Sets the multipliers
-            if (rating1 < (servers[msg.guild.id].config.starting_rating + 100)) {
-                mult1 = 20 + (20 * .012 * ((servers[msg.guild.id].config.starting_rating + 50) - rating1));
+            if (rating1 < (starting_rating + 100)) {
+                mult1 = 20 + (20 * .012 * ((starting_rating + 50) - rating1));
             } else {
                 mult1 = 20;
             }
-            if (rating2 < (servers[msg.guild.id].config.starting_rating + 100)) {
-                mult2 = 20 - (20 * .012 * ((servers[msg.guild.id].config.starting_rating + 50) - rating2));
+            if (rating2 < (starting_rating + 100)) {
+                mult2 = 20 - (20 * .012 * ((starting_rating + 50) - rating2));
             } else {
                 mult2 = 20;
             }
@@ -300,14 +418,14 @@ client.on("message", async msg => {
             newRating1 = rating1 + mult1*(1 - P1);
             newRating2 = rating2 + mult2*(0 - P2);
 
-            newRating1 = Number(newRating1.toFixed(2));
-            newRating2 = Number(newRating2.toFixed(2));
+            newRating1 = Number(Number(newRating1).toFixed(2));
+            newRating2 = Number(Number(newRating2).toFixed(2));
             
             // Ensures that each player's rating doesn't drop below 1000
-            newRating1 = (newRating1 < servers[msg.guild.id].config.starting_rating) ? servers[msg.guild.id].config.starting_rating : newRating1;
-            newRating2 = (newRating2 < servers[msg.guild.id].config.starting_rating) ? servers[msg.guild.id].config.starting_rating : newRating2;
+            newRating1 = (newRating1 < starting_rating) ? starting_rating : newRating1;
+            newRating2 = (newRating2 < starting_rating) ? starting_rating : newRating2;
             
-            var max = servers[msg.guild.id].config.max_rating;
+            var max = Number(await getConfig(msg, "max_rating"));
 
             if (max < 0) max = Infinity;
 
@@ -316,22 +434,35 @@ client.on("message", async msg => {
             newRating2 = (newRating2 > max) ? max : newRating2;
 
             // Updates the rating
-            servers[msg.guild.id].users[mentions[0].tag]["rating"] = newRating1;
-            servers[msg.guild.id].users[mentions[1].tag]["rating"] = newRating2;
+            await setRating(msg, mentions[0].tag, newRating1);
+            await setRating(msg, mentions[1].tag, newRating2);
 
-            if (servers[msg.guild.id].config.history) {
-                registerAction(msg, msg.member.user.tag, "match", {
-                    "winner": {
+            if (await getConfig(msg, "history")) {
+                // msg, type, user, users, config, alt_params
+                await registerAction(msg, "match", msg.member.user.tag, [
+                    {
                         "user": mentions[0].tag,
-                        "pre_rating": rating1,
-                        "post_rating": newRating1
+                        "ratings": {
+                            "pre": rating1,
+                            "post": newRating1
+                        },
+                        "results": {
+                            "pre": res1,
+                            "post": newRes1
+                        }
                     },
-                    "loser": {
+                    {
                         "user": mentions[1].tag,
-                        "pre_rating": rating2,
-                        "post_rating": newRating2
-                    },
-                });
+                        "ratings": {
+                            "pre": rating2,
+                            "post": newRating2
+                        },
+                        "results": {
+                            "pre": res2,
+                            "post": newRes2
+                        }
+                    }
+                ], [], []);
             }
 
             msg.channel.send(`> **Match recorded!**\n> ${mentions[0].username} **(winner)**\n> **Old Rating:** ${rating1}\n> New Rating: ${newRating1}\n> ${mentions[1].username} **(loser)**\n> **Old Rating:** ${rating2}\n> New Rating: ${newRating2}`);
@@ -347,7 +478,7 @@ client.on("message", async msg => {
         const self = (args.length === 1);
 
         // Queries the user in the database to ensure it has a value in it
-        const rating = getRating(msg, self ? msg.member.user.tag : mentions.tag);
+        const rating = await getRating(msg, self ? msg.member.user.tag : mentions.tag);
 
         // Checks various syntax components
         if ((!self && mentions === undefined) || !Number.isInteger(Number(self ? args[0] : args[1]))) {
@@ -360,24 +491,34 @@ client.on("message", async msg => {
 
         newRating = Number(newRating.toFixed(2));
 
-        // Ensures that the player's rating doesn't drop below 1000
-        newRating = (newRating < servers[msg.guild.id].config.starting_rating) ? servers[msg.guild.id].config.starting_rating : newRating;
+        const starting_rating = await getConfig(msg, "starting_rating");
 
-        var max = servers[msg.guild.id].config.max_rating;
+        // Ensures that the player's rating doesn't drop below 1000
+        newRating = (newRating < starting_rating) ? starting_rating : newRating;
+
+        var max = await getConfig(msg, "max_rating");
 
         if (max < 0) max = Infinity;
 
         newRating = (newRating > max) ? max : newRating;
 
         // Updates the rating
-        servers[msg.guild.id].users[self ? msg.member.user.tag : mentions.tag].rating = newRating;
+        await setRating(msg, self ? msg.member.user.tag : mentions.tag, newRating)
 
-        if (servers[msg.guild.id].config.history) {
-            registerAction(msg, msg.member.user.tag, "set", {
-                "user": self ? msg.member.user.tag : mentions.tag,
-                "pre_rating": rating,
-                "post_rating": newRating
-            });
+        if (await getConfig(msg, "history")) {
+            registerAction(msg, "set", msg.member.user.tag, [
+                {
+                    "user": self ? msg.member.user.tag : mentions.tag,
+                    "ratings": {
+                        "pre": rating,
+                        "post": newRating
+                    },
+                    "results": {
+                        "pre": await getResults(msg, self ? msg.member.user.tag : mentions.tag),
+                        "post": await getResults(msg, self ? msg.member.user.tag : mentions.tag)
+                    }
+                },
+            ], [], []);
         }
 
         msg.channel.send(`${self ? "Your" : mentions.username + "'s"} rating has been set to ${newRating}`);
@@ -391,17 +532,29 @@ client.on("message", async msg => {
         // Whether there is not a mention AND the keyword 'global' is included
         const global = self ? false : (args[0] === "global");
 
-        if (servers[msg.guild.id].config.history) {
-            registerAction(msg, msg.member.user.tag, "reset", {
-                "global": global,
-                "user": self ? msg.member.user.tag : global ? null : mentions.tag,
-                "rating": global ? null : getRating(msg, self ? msg.member.user.tag : mentions.tag),
-                "results": global ? null : servers[msg.guild.id].users[self ? msg.member.user.tag : mentions.tag].results
-            });
+        if (await getConfig(msg, "history")) {
+            await registerAction(msg, "reset", msg.member.user.tag, global ? [] : [
+                {
+                    "user": self ? msg.member.user.tag : mentions.tag,
+                    "ratings": {
+                        "pre": await getRating(msg, self ? msg.member.user.tag : mentions.tag),
+                        "post": await getConfig(msg, "starting_rating")
+                    },
+                    "results": {
+                        "pre": await getResults(msg, self ? msg.member.user.tag : mentions.tag),
+                        "post": { "wins": 0, "losses": 0}
+                    }
+                }
+            ], [], [
+                {
+                    "type": "global",
+                    "value": global
+                }
+            ])
         }
 
         // Resets the database if global is true
-        servers[msg.guild.id].users = global ? {} : servers[msg.guild.id].users;
+        if (global) await setUsers(msg, []);
 
         // Queries various syntax components
         if ((!self && !global) && (mentions === undefined)) {
@@ -410,19 +563,22 @@ client.on("message", async msg => {
         }
 
         // Resets a particular user
-        servers[msg.guild.id].users[self ? msg.member.user.tag : global ? null : mentions.tag] = undefined;
+        if (!(global)) {
+            var user = self ? msg.member.user.tag : mentions.tag;
+            await setRating(msg, user, await getConfig(msg, "starting_rating"));
+            await setWins(msg, user, 0);
+            await setLosses(msg, user, 0);
+        }
 
         // An overly complicated response command that I made because I enjoy simping for the ternary operator
-        msg.channel.send(`${self ? "You" : global ? "The database" : mentions.username} ${self ? "have" : "has"} had ${self ? "your" : global ? "all" : "their"} ${global ? "ratings" : "rating"} reset to ${servers[msg.guild.id].config.starting_rating}`);
+        msg.channel.send(`${self ? "You" : global ? "The database" : mentions.username} ${self ? "have" : "has"} had ${self ? "your" : global ? "all" : "their"} ${global ? "ratings" : "rating"} reset to ${await getConfig(msg, "starting_rating")}`);
     // Winrate command
-    } else if(command === "winrate" && formatted(msg, args, 0, 1) && servers[msg.guild.id].config.winrate){
+    } else if(command === "winrate" && formatted(msg, args, 0, 1) && (await getConfig(msg, "winrate"))){
         // Gets 'the' mention
         const mentions = msg.mentions.users.first();
 
         // Whether there is not a mention
         const self = (args.length === 0);
-
-        const winrate = getWinRate(msg, self ? msg.member.user.tag : mentions.tag);
 
         // Queries various syntax components
         if (!self && mentions === undefined) {
@@ -430,8 +586,10 @@ client.on("message", async msg => {
             return;
         }
 
+        const winrate = await getWinRate(msg, self ? msg.member.user.tag : mentions.tag);
+
         msg.channel.send(`${(self) ? "Your" : mentions.username + "'s"} win rate is ${winrate.toFixed(2)}%`);
-    } else if (command === "undo" && formatted(msg, args, 0, 2) && msg.member.hasPermission("ADMINISTRATOR") && servers[msg.guild.id].config.history) {
+    } else if (command === "undo" && formatted(msg, args, 0, 2) && msg.member.hasPermission("ADMINISTRATOR") && (await getConfig(msg, "history"))) {
 
         // Gets 'the' mention
         const mentions = msg.mentions.users.first();
@@ -454,104 +612,46 @@ client.on("message", async msg => {
         const tag = self ? msg.member.user.tag : mentions.tag;
         const server = msg.guild.id;
 
-        var updated_users = {};
+        var mes = `> :thumbsup: **Done!**\n`;
 
         // Queries various syntax components
-        if (servers[server].actions.length < num) {
+        if ((await Server.findOne({ id: msg.guild.id })).users.length < num) {
             msg.channel.send("Invalid syntax. Try: `~help`.");
             return;
         }
 
         
         for (let index = 0; index < num; index++) {
-            var action = servers[server].actions.pop();
-            switch (action.type) {
-                case "match":
+            var serv = await Server.findOne({ id: msg.guild.id });
+            var action = serv.actions.pop();
+            await serv.save();
 
-                    const rating1 = getRating(msg, action.options.winner.user);
-                    const rating2 = getRating(msg, action.options.loser.user);
-
-                    const wl1 = getWinRate(msg, action.options.winner.user);
-                    const wl2 = getWinRate(msg, action.options.loser.user);
-
-                    if (rating1 != action.options.winner.post_rating || rating2 != action.options.loser.post_rating) {
-                        msg.channel.send("Encountered an issue undoing an action! Please report this to `VoidBehemoth#9503`, `BunsenBurn#6467`, or `RyanMych (Shulk tiem)#0847`.")
-                        return;
-                    }
-
-                    servers[msg.guild.id].users[action.options.winner.user].results.wins -= 1;
-                    servers[msg.guild.id].users[action.options.loser.user].results.losses -= 1;
-
-                    servers[msg.guild.id].users[action.options.winner.user].rating = action.options.winner.pre_rating;
-                    servers[msg.guild.id].users[action.options.loser.user].rating = action.options.loser.pre_rating;
-
-                    updated_users[action.options.winner.user] = {
-                        "old_rating": (updated_users[action.options.winner.user] === undefined) ? rating1 : updated_users[action.options.winner.user].old_rating,
-                        "new_rating": action.options.winner.pre_rating,
-                        "old_wl": (updated_users[action.options.winner.user] === undefined) ? wl1 : updated_users[action.options.winner.user].old_wl,
-                        "new_wl": getWinRate(msg, action.options.winner.user)
-                    };
-
-                    updated_users[action.options.loser.user] = {
-                        "old_rating": (updated_users[action.options.loser.user] === undefined) ? rating2: updated_users[action.options.loser.user].old_rating,
-                        "new_rating": action.options.loser.pre_rating,
-                        "old_wl": (updated_users[action.options.loser.user] === undefined) ?  wl2 : updated_users[action.options.loser.user].old_wl,
-                        "new_wl": getWinRate(msg, action.options.loser.user)
-                    };
-
-                    break;
-                case "set":
-
-                    const rating = getRating(msg, action.options.user);
-                    const wl = getWinRate(msg, action.options.user);
-
-                    if (rating != action.options.post_rating) {
-                        msg.channel.send("Encountered issue B while undoing an action! Please report this to `VoidBehemoth#9503`, `BunsenBurn#6467`, or `RyanMych (Shulk tiem)#0847`.")
-                        return;
-                    }
-
-                    servers[msg.guild.id].users[action.options.user].rating = action.options.pre_rating;
-
-                    updated_users[action.options.user] = {
-                        "old_rating": (updated_users[action.options.user] === undefined) ? rating : updated_users[action.options.user].old_rating,
-                        "new_rating": getRating(msg, action.options.user),
-                        "old_wl": (updated_users[action.options.user] === undefined) ? wl : updated_users[action.options.user].old_wl,
-                        "new_wl": getWinRate(msg, action.options.user)
-                    };
-
-                    break;
-                case "reset":
-
-                    if (action.options.global) {
+            for (a in action.alt_params) {
+                switch (action.alt_params[a].type) {
+                    case "global":
                         msg.channel.send("> :x: **Due to storage concerns, it is not possible to undo a global reset.**");
                         return;
-                    }
-
-                    if (servers[msg.guild.id].users[action.options.user] != undefined) {
-                        msg.channel.send("Encountered an issue undoing an action! Please report this to `VoidBehemoth#9503`, `BunsenBurn#6467`, or `RyanMych (Shulk tiem)#0847`.")
-                        return;
-                    }
-
-                    registerUser(msg, action.options.user, action.options.rating, action.options.results);
-
-                    updated_users[action.options.user] = {
-                        "old_rating": servers[msg.guild.id].config.starting_rating,
-                        "new_rating": getRating(msg, action.options.user),
-                        "old_wl": 0,
-                        "new_wl": getWinRate(msg, action.options.user)
-                    };
-
-                    break;
-                default:
-                    msg.channel.send("Encountered issue A while undoing an action! Please report this to `VoidBehemoth#9503`, `BunsenBurn#6467`, or `RyanMych (Shulk tiem)#0847`.")
-                    return;
+                    default:
+                        break;
+                }
             }
-        }
 
-        var mes = `> :thumbsup: **Done!**\n`;
+            for (u in action.users) {
+                var user = action.users[u];
 
-        for (const u in updated_users) {
-            mes = mes + `> \n> \n> :bust_in_silhouette: **${u}**\n> \n> :medal: Rating: **${updated_users[u].old_rating}** –> **${updated_users[u].new_rating}**\n> \n> :fleur_de_lis: Win-Loss Ratio: **${updated_users[u].old_wl}%** –> **${updated_users[u].new_wl}%**\n`;
+                mes = mes + `> \n> \n> :bust_in_silhouette: **${user.user}**\n> \n> :medal: Rating: **${user.ratings.post}** –> **${user.ratings.pre}**\n> \n> :fleur_de_lis: Win-Loss Ratio: **${await getWinRate(msg, user.user, user.results.post.wins, user.results.post.losses)}%** –> **${await getWinRate(msg, user.user, user.results.pre.wins, user.results.pre.losses)}%**\n`;
+
+                await setRating(msg, user.user, user.ratings.pre);
+                await setWins(msg, user.user, user.results.pre.wins);
+                await setLosses(msg, user.user, user.results.pre.wins);
+            }
+
+            for (c in action.config) {
+
+                mes = mes + `> \n> \n> :gear: **${action.component}**\n> \n> :wrench: **${action.post}** –> **${action.pre}**\n`
+
+                setConfig(msg, action.config[c].component, action.config[c].value);
+            }
         }
         
         msg.channel.send(mes);
@@ -581,19 +681,19 @@ client.on("message", async msg => {
         if (args[1] === "reset") {
             switch (comp) {
                 case "starting_rating":
-                    servers[msg.guild.id].config.starting_rating = 1000;
+                    await setConfig(msg, comp, 1000);
                     msg.channel.send(`${comp} has been set to 1000`);
                     break;
                 case "max_rating":
-                    servers[msg.guild.id].config.max_rating = -1;
+                    await setConfig(msg, comp, -1);
                     msg.channel.send(`${comp} has been set to -1`);
                     break;
                 case "history":
-                    servers[msg.guild.id].config.history = true;
+                    await setConfig(msg, comp, true);
                     msg.channel.send(`${comp} has been set to true`);
                     break;
                 case "winrate":
-                    servers[msg.guild.id].config.winrate = true;
+                    await setConfig(msg, comp, true);
                     msg.channel.send(`${comp} has been set to true`);
                     break;
                 default:
@@ -608,7 +708,7 @@ client.on("message", async msg => {
 
         if (!Number.isInteger(num)) {
             if (typeof bool === "boolean") {
-                servers[msg.guild.id].config[comp] = bool;
+                await setConfig(msg, comp, bool);
                 msg.channel.send(`${comp} has been set to ${bool}`);
                 return;
             }
@@ -616,12 +716,12 @@ client.on("message", async msg => {
             return;
         }
 
-        servers[msg.guild.id].config[comp] = num;
+        await setConfig(msg, comp, num);
 
         msg.channel.send(`${comp} has been set to ${num}`);
    } else if (command === "top" && formatted(msg, args, 0, 2)) {
        if (args.length === 0) {
-           getTopUsers(msg, "rating", 10);
+           await getTopUsers(msg, "rating", 10);
            return;
        }
 
@@ -630,9 +730,9 @@ client.on("message", async msg => {
             const num = Number(args[0]);
 
             if (Number.isInteger(num) && ((-1 * num) < 0) && Number.isFinite(num)) {
-                getTopUsers(msg, "rating", num);
-            } else if (args[0] === "top" || args[0] === "winrate") {
-                getTopUsers(msg, args[0], 10);
+                await getTopUsers(msg, "rating", num);
+            } else if (args[0] === "rating" || args[0] === "winrate") {
+                await getTopUsers(msg, args[0], 10);
             } else {
                 msg.channel.send("Invalid syntax. Try: `~help`.");
             }
@@ -647,7 +747,7 @@ client.on("message", async msg => {
            msg.channel.send("Invalid syntax. Try `~help`");
        }
 
-       getTopUsers(msg, args[0], num);
+       await getTopUsers(msg, args[0], num);
    }
 });
 
