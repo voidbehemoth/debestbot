@@ -266,7 +266,7 @@ client.on("message", async msg => {
     }
     
     // Exits process if the user is a bot, is not in a server, is discord itself, or did not send the message with the designated prefix.
-    if (!msg.content.startsWith(prefix)) return;
+    if (!msg.content.startsWith(prefix) || Number(msg.channel.id) != 414166792483635200) return;
 
     
     if (!(await Server.exists({id: msg.guild.id}))) {
