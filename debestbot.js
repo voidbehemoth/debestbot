@@ -39,13 +39,11 @@ async function registerServer(msg) {
 }
 
 async function getConfig(msg, component = null) {
-    var config = (await Server.findOne({id: msg.guild.id})).config;
-    return (component === null) ? config : config[component];
+    return (component === null) ? (await Server.findOne({id: msg.guild.id})).config : (await Server.findOne({id: msg.guild.id})).config[component];
 }
 
 async function getUsers(msg) {
-    var users = (await Server.findOne({id: msg.guild.id})).users;
-    return users;
+    return (await Server.findOne({id: msg.guild.id})).users;
 }
 
 async function findUserIndex (msg, user, users) {
@@ -60,28 +58,20 @@ async function setUsers(msg, value) {
     server.save();
 }
 
-async function userExists(msg, user) {
-    return (await (getUsers(msg)).find((v) => {
-        return (user.tag === user);
-    }) != undefined);
-}
-
 // Initializes a new user in the database. Not for use outside of accessor functions.
 // user: GuildMember, rating: Integer, mult: Integer
 async function registerUser(msg, user, rating, results = { wins: 0, losses: 0 }) {
     var server = await Server.findOne({id: msg.guild.id});
-    var user = {
+
+    server.users.push({
         tag: user,
         // Your rating... cannot go beneath 1000.
         rating: rating,
         // Your match results.
         results: await getConfig(msg, "winrate") ? results : undefined
-    };
+    });
 
-    server.users.push(user);
     await server.save();
-
-    return user;
 }
 
 async function registerAction(msg, type, user, users, config, alt_params) {
@@ -119,8 +109,6 @@ async function registerAction(msg, type, user, users, config, alt_params) {
     server.actions.set(len, new_action);
 
     await server.save();
-
-    return server.actions[len];
 }
 
 async function getActions (msg) {
@@ -272,8 +260,15 @@ client.on("ready", () => {
 
 // Called automatically when client receives a message from discord
 client.on("message", async msg => {
+    if (msg.system || msg.author.bot) return;
+
+    if (msg.guild === null) {
+        if (msg.content.includes("de") || msg.author.tag === "DeRealDeal#0451") msg.channel.send(":anger:");
+        return;
+    }
+    
     // Exits process if the user is a bot, is not in a server, is discord itself, or did not send the message with the designated prefix.
-    if (!msg.content.startsWith(prefix) || msg.guild === null || msg.system || msg.author.bot) return;
+    if (!msg.content.startsWith(prefix)) return;
 
     
     if (!(await Server.exists({id: msg.guild.id}))) {
@@ -748,6 +743,10 @@ client.on("message", async msg => {
        }
 
        await getTopUsers(msg, args[0], num);
+   } else if (command === "de" && formatted(msg, args, 0, 0)) {
+       msg.channel.send("```\n     _/\\____/\\_\n    <( ō    ō )>\n    /|        |\\ \n   / |   . .  | \\ \n  | _|   __   |_ |\n   \\__\\______/\\__/\n     __| | | |__\n   /____/  \\____\\ \n```");
+   } else if (command === "code" && formatted(msg, args, 0, 0)) {
+       msg.channel.send(":sparkles: **The code** :sparkles:: https://github.com/voidbehemoth/debestbot")
    }
 });
 
