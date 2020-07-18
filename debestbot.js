@@ -18,7 +18,7 @@ const Server = require("./models/Server.model");
 const client = new Discord.Client();
 
 mongoose.connect(url, {useNewUrlParser: true, useUnifiedTopology: true});
-mongoose.set('debug', true)
+mongoose.set('debug', false);
 
 const botdb = mongoose.connection;
 botdb.on("error", console.error.bind(console, "connection error:"));
@@ -185,14 +185,12 @@ async function getTopUsers(msg, cat, num) {
             msg.channel.send(`${Number(c) + 1}. ${topcut[c].tag}: (${cat}) ${(cat === "winrate") ? (await getWinRate(msg, topcut[c].tag)) : (await getRating(msg, topcut[c].tag))}${(cat === "winrate") ? "%" : ""}`);
         }
     }
-    console.log(topcut)
 }
 
 async function setRating(msg, user, value) {
     var server = await Server.findOne({id: msg.guild.id})
 
     var index = await findUserIndex(msg, user, server.users);
-    console.log(index);
 
     var new_rating = server.users[index];
 
