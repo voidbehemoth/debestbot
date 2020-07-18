@@ -309,7 +309,7 @@ client.on("message", async msg => {
             var isSecret = (s != null && s != undefined);
             var isCommand = (c != null && c != undefined);
             
-            if (isCommand || (msg.member.hasPermission("ADMINISTRATOR") && isSecret)) {
+            if (isCommand || (msg.member.hasPermission("MANAGE_MESSAGES") && isSecret)) {
                 if ((c != "winrate" || getConfig(msg, "winrate")) && (s != "undo" || getConfig(msg, "history"))) {
                     msg.channel.send(m);
                     msg.channel.send(`> ${isSecret ? ":cyclone:" : ":globe_with_meridians:"} **${prefix + (isSecret ? s : c)}:** ${isSecret ? "(DEV)" : ""} ${(isSecret) ? secrets[s] : commands[c]}`);
@@ -332,7 +332,7 @@ client.on("message", async msg => {
         }
 
         // Secret commands
-        if (msg.member.hasPermission("ADMINISTRATOR")) {
+        if (msg.member.hasPermission("MANAGE_MESSAGES")) {
             for (const com in secrets) {
                 if (com != "undo [username & tag] [number of undos to execute]" || getConfig(msg, "history")) {
                     msg.channel.send(`> :cyclone: **${prefix + com}:** (DEV)\n>    ${secrets[com]}`);
@@ -463,7 +463,7 @@ client.on("message", async msg => {
             msg.channel.send("Not enough mentions. Try: `~help`.");
         }
     // set command
-    } else if (command === "set" && formatted(msg, args, 1, 2) && msg.member.hasPermission("ADMINISTRATOR")) {
+    } else if (command === "set" && formatted(msg, args, 1, 2) && msg.member.hasPermission("MANAGE_MESSAGES")) {
         // Gets 'the' mention
         const mentions = msg.mentions.users.first();
 
@@ -517,7 +517,7 @@ client.on("message", async msg => {
         msg.channel.send(`${self ? "Your" : mentions.username + "'s"} rating has been set to ${newRating}`);
     
     // Reset command
-    } else if (command === "reset" && formatted(msg, args, 0, 1) && msg.member.hasPermission("ADMINISTRATOR")) {
+    } else if (command === "reset" && formatted(msg, args, 0, 1) && msg.member.hasPermission("MANAGE_MESSAGES")) {
         // Gets 'the' mention
         const mentions = msg.mentions.users.first();
         // Whether there is not a mention
@@ -582,7 +582,7 @@ client.on("message", async msg => {
         const winrate = await getWinRate(msg, self ? msg.member.user.tag : mentions.tag);
 
         msg.channel.send(`${(self) ? "Your" : mentions.username + "'s"} win rate is ${winrate.toFixed(2)}%`);
-    } else if (command === "undo" && formatted(msg, args, 0, 2) && msg.member.hasPermission("ADMINISTRATOR") && (await getConfig(msg, "history"))) {
+    } else if (command === "undo" && formatted(msg, args, 0, 2) && msg.member.hasPermission("MANAGE_MESSAGES") && (await getConfig(msg, "history"))) {
 
         // Gets 'the' mention
         const mentions = msg.mentions.users.first();
@@ -648,7 +648,7 @@ client.on("message", async msg => {
         }
         
         msg.channel.send(mes);
-   } else if (command === "config" && formatted(msg, args, 0, 2) && msg.member.hasPermission("ADMINISTRATOR")) {
+   } else if (command === "config" && formatted(msg, args, 0, 2) && msg.member.hasPermission("MANAGE_MESSAGES")) {
 
         if (args.length === 0) {
             for (const comp in components) {
