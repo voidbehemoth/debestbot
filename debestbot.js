@@ -289,7 +289,7 @@ client.on("message", async msg => {
     }
 
     var channels = await getConfig(msg, "command_channels");
-    if ((!channels.includes(Number(msg.channel.id))) && (Array(channels) != [])) return;
+    if ((!channels.includes(Number(msg.channel.id))) && (channels.length > 0)) return;
 
     const mentions = msg.mentions.members.array() || new Array();
 
