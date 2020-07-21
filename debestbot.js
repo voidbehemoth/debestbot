@@ -262,6 +262,10 @@ client.on("ready", () => {
 client.on("message", async msg => {
     if (msg.system || msg.author.bot) return;
 
+    if (msg.content.toLowerCase().includes("pog")) {
+        msg.react(msg.guild.emojis.cache.get("735169352042807388"));
+    }
+
     if (msg.guild === null) {
         if (msg.content.includes("de") || msg.author.tag === "DeRealDeal#0451") {
             var rand = Math.floor(Math.random() * 10);
