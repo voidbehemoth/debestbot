@@ -120,7 +120,7 @@ async function getActions (msg) {
 async function setConfig(msg, component, value) {
     var server = await Server.find({id: msg.guild.id});
     server.config[component] = value;
-    config.save();
+    server.save();
 }
 
 // accessor function to get rating from user
