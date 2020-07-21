@@ -264,7 +264,7 @@ client.on("message", async msg => {
 
     if (msg.guild === null) {
         if (msg.content.includes("de") || msg.author.tag === "DeRealDeal#0451") {
-            var rand = Math.floor(Math.random() * 5);
+            var rand = Math.floor(Math.random() * 10);
             if (rand === 0) {
                 msg.react("❓");
             } else if (rand === 1) {
@@ -275,6 +275,16 @@ client.on("message", async msg => {
                 msg.channel.send(":pensive:");
             } else if (rand === 4) {
                 msg.channel.send(":anger:");
+            } else if (rand === 5) {
+                msg.channel.send("huh");
+            } else if (rand === 6) {
+                msg.channel.send("neat");
+            } else if (rand === 7) {
+                msg.react("🤔");
+            } else if (rand === 8) {
+                msg.react("😳");
+            } else if (rand === 9) {
+                msg.react("🏳️‍🌈");
             }
         }
         return;
@@ -289,7 +299,7 @@ client.on("message", async msg => {
     }
 
     var channels = await getConfig(msg, "command_channels");
-    if (!(channels.includes(msg.channel.id)) && (channels.length > 0)) return;
+    if (!(channels.includes(msg.channel.id)) && (channels.length > 0) && !(msg.member.hasPermission("MANAGE_MESSAGES"))) return;
 
     const mentions = msg.mentions.members.array() || new Array();
 
