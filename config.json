@@ -7,6 +7,8 @@
         "winrate [username & tag]": "Retrieves the user's winrate. Will enter the user into the database if not already.",
         "top ['rating' or 'winrate' (without quotation marks] [how many users to display]": "Retrieves the top users from the category of choice (category will default to rating). The number of users to retrieve can also be specified (defaults to 10).",
         "de": "Displays a wonderful ascii art of de by Shulk Tiem.",
+        "dab": "bruh moment",
+        "floss": "bruh moment #2",
         "code": "Sends a link to the GitHub repo."
         },
     "secrets": {
@@ -17,9 +19,11 @@
     },
     "components": {
         "starting_rating": "How much rating each player should start with. (Default: `1000`).",
+        "min_rating": "The minimum possible rating. Set as `-1` to make it infinitely low. (Default: `1000`).",
         "max_rating": "The maximum possible rating. Set as `-1` to make it infinite. (Default: `-1`).",
         "history": "Whether or not to keep a log of commands executed for this server. Disabling this will also disable the `~undo` command. (Default: `true`).",
-        "winrate": "Whether or not to keep track of winrate on this server. Disabling this will also disable the `~winrate` command. (Default: `true`)."
+        "winrate": "Whether or not to keep track of winrate on this server. Disabling this will also disable the `~winrate` command. (Default: `true`).",
+        "command_channels": "A list of channels that commands are allowed to be sent in. Will default to all channels if left empty. (Default: `(empty)`)."
     },
     "types": {
         "match": ["winner", "loser"],

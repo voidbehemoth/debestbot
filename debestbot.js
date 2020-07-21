@@ -29,9 +29,11 @@ async function registerServer(msg) {
         id: msg.guild.id,
         config: {
             "starting_rating": 1000,
+            "min_rating": 1000,
             "max_rating": -1,
             "history": true,
-            "winrate": true
+            "winrate": true,
+            "command_channels": []
         },
         users: [],
         actions: []
@@ -261,17 +263,33 @@ client.on("message", async msg => {
     if (msg.system || msg.author.bot) return;
 
     if (msg.guild === null) {
-        if (msg.content.includes("de") || msg.author.tag === "DeRealDeal#0451") msg.channel.send(":anger:");
+        if (msg.content.includes("de") || msg.author.tag === "DeRealDeal#0451") {
+            var rand = Math.floor(Math.random() * 5);
+            if (rand === 0) {
+                msg.react("❓");
+            } else if (rand === 1) {
+                msg.channel.send("Why are you doing this to me?");
+            } else if (rand === 2) {
+                msg.channel.send("!!");
+            } else if (rand === 3) {
+                msg.channel.send(":pensive:");
+            } else if (rand === 4) {
+                msg.channel.send(":anger:");
+            }
+        }
         return;
     }
     
     // Exits process if the user is a bot, is not in a server, is discord itself, or did not send the message with the designated prefix.
-    if (!msg.content.startsWith(prefix) || Number(msg.channel.id) != 414166792483635200) return;
+    if (!msg.content.startsWith(prefix)) return;
 
     
     if (!(await Server.exists({id: msg.guild.id}))) {
         await registerServer(msg);
     }
+
+    var channels = await getConfig(msg, "command_channels");
+    if ((!channels.includes(Number(msg.channel.id))) && (Array(channels) != [])) return;
 
     const mentions = msg.mentions.members.array() || new Array();
 
@@ -396,12 +414,12 @@ client.on("message", async msg => {
             const starting_rating = Number(await getConfig(msg, "starting_rating"));
 
             // Sets the multipliers
-            if (rating1 < (starting_rating + 100)) {
+            if (rating1 < (starting_rating + 50)) {
                 mult1 = 20 + (20 * .012 * ((starting_rating + 50) - rating1));
             } else {
                 mult1 = 20;
             }
-            if (rating2 < (starting_rating + 100)) {
+            if (rating2 < (starting_rating + 50)) {
                 mult2 = 20 - (20 * .012 * ((starting_rating + 50) - rating2));
             } else {
                 mult2 = 20;
@@ -413,10 +431,14 @@ client.on("message", async msg => {
 
             newRating1 = Number(Number(newRating1).toFixed(2));
             newRating2 = Number(Number(newRating2).toFixed(2));
+
+            var min = await getConfig(msg, "min_rating");
+
+            if (min === -1) min = Number.NEGATIVE_INFINITY;
             
             // Ensures that each player's rating doesn't drop below 1000
-            newRating1 = (newRating1 < starting_rating) ? starting_rating : newRating1;
-            newRating2 = (newRating2 < starting_rating) ? starting_rating : newRating2;
+            newRating1 = (newRating1 < min) ? min : newRating1;
+            newRating2 = (newRating2 < min) ? min : newRating2;
             
             var max = Number(await getConfig(msg, "max_rating"));
 
@@ -484,10 +506,12 @@ client.on("message", async msg => {
 
         newRating = Number(newRating.toFixed(2));
 
-        const starting_rating = await getConfig(msg, "starting_rating");
+        const min = await getConfig(msg, "min_rating");
+
+        if (min === -1) min = Number.NEGATIVE_INFINITY;
 
         // Ensures that the player's rating doesn't drop below 1000
-        newRating = (newRating < starting_rating) ? starting_rating : newRating;
+        newRating = (newRating < min) ? min : newRating;
 
         var max = await getConfig(msg, "max_rating");
 
@@ -581,7 +605,9 @@ client.on("message", async msg => {
 
         const winrate = await getWinRate(msg, self ? msg.member.user.tag : mentions.tag);
 
-        msg.channel.send(`${(self) ? "Your" : mentions.username + "'s"} win rate is ${winrate.toFixed(2)}%`);
+        const games = (await getWins(msg, self ? msg.member.user.tag : mentions.tag)) + (await getLosses(msg, self ? msg.member.user.tag : mentions.tag))
+
+        msg.channel.send(`${(self) ? "Your" : mentions.username + "'s"} win rate is ${winrate.toFixed(2)}% (out of ${games} games).`);
     } else if (command === "undo" && formatted(msg, args, 0, 2) && msg.member.hasPermission("MANAGE_MESSAGES") && (await getConfig(msg, "history"))) {
 
         // Gets 'the' mention
@@ -675,22 +701,30 @@ client.on("message", async msg => {
             switch (comp) {
                 case "starting_rating":
                     await setConfig(msg, comp, 1000);
-                    msg.channel.send(`${comp} has been set to 1000`);
+                    msg.channel.send(`${comp} has been reset to 1000`);
+                    break;
+                case "min_rating":
+                    await setConfig(msg, comp, 1000);
+                    msg.channel.send(`${comp} has been reset to 1000`);
                     break;
                 case "max_rating":
                     await setConfig(msg, comp, -1);
-                    msg.channel.send(`${comp} has been set to -1`);
+                    msg.channel.send(`${comp} has been reset to -1`);
                     break;
                 case "history":
                     await setConfig(msg, comp, true);
-                    msg.channel.send(`${comp} has been set to true`);
+                    msg.channel.send(`${comp} has been reset to true`);
                     break;
                 case "winrate":
                     await setConfig(msg, comp, true);
-                    msg.channel.send(`${comp} has been set to true`);
+                    msg.channel.send(`${comp} has been reset to true`);
+                    break;
+                case "command_channels":
+                    await setConfig(msg, comp, []);
+                    msg.channel.send(`${comp} has been reset to (empty)`)
                     break;
                 default:
-                    msg.channel.send("Invalid syntax. Try: `~help`.");
+                    msg.channel.send("Could not reset that config component. Invalid syntax. Try: `~help`.");
                     break;
             }
             return;
@@ -701,6 +735,7 @@ client.on("message", async msg => {
 
         if (!Number.isInteger(num)) {
             if (typeof bool === "boolean") {
+                if (comp != "history" && comp != "winrate") return;
                 await setConfig(msg, comp, bool);
                 msg.channel.send(`${comp} has been set to ${bool}`);
                 return;
@@ -708,6 +743,24 @@ client.on("message", async msg => {
             msg.channel.send("Invalid syntax. Try: `~help`.");
             return;
         }
+
+        if (comp === "command_channels") {
+            var channels = await getConfig(msg, comp);
+            var pos = channels.indexOf(num);
+
+            if (pos != -1) {
+                channels[pos] = num;
+                await setConfig(msg, comp, channels);
+                msg.channel.send(`${num} was removed from whitelisted command channels.`);
+                return;
+            }
+            channels[channels.length] = num;
+            await setConfig(msg, comp, channels);
+            msg.channel.send(`${num} was added to whitelisted command channels.`);
+            return;
+        }
+
+        if (comp != "starting_rating" && comp != "min_rating" && comp != "max_rating") return;
 
         await setConfig(msg, comp, num);
 
@@ -743,6 +796,10 @@ client.on("message", async msg => {
        await getTopUsers(msg, args[0], num);
    } else if (command === "de" && formatted(msg, args, 0, 0)) {
        msg.channel.send("```\n     _/\\____/\\_\n    <( ō    ō )>\n    /|        |\\ \n   / |   . .  | \\ \n  | _|   __   |_ |\n   \\__\\______/\\__/\n     __| | | |__\n   /____/  \\____\\ \n```");
+   } else if (command === "dab" && formatted(msg, args, 0, 0)) {
+       msg.channel.send("https://media.discordapp.net/attachments/734579399306772610/734856096409452559/DeDab.gif");
+   } else if (command === "floss" && formatted(msg, args, 0, 0)) {
+        msg.channel.send("https://images-ext-2.discordapp.net/external/AH3PyscD616GxhTePm8xcbmIE2NjK-gJ6iQsucZAUQQ/https/media.discordapp.net/attachments/734579399306772610/734884722429395044/DeFloss.gif");
    } else if (command === "code" && formatted(msg, args, 0, 0)) {
        msg.channel.send(":sparkles: **The code** :sparkles:: https://github.com/voidbehemoth/debestbot")
    }
