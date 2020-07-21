@@ -289,7 +289,7 @@ client.on("message", async msg => {
     }
 
     var channels = await getConfig(msg, "command_channels");
-    if ((!channels.includes(Number(msg.channel.id))) && (channels.length > 0)) return;
+    if (!(channels.includes(msg.channel.id)) && (channels.length > 0)) return;
 
     const mentions = msg.mentions.members.array() || new Array();
 
@@ -745,17 +745,17 @@ client.on("message", async msg => {
         }
 
         if (comp === "command_channels") {
-            var channels = await getConfig(msg, comp);
-            var pos = channels.indexOf(num);
+            var serv = await Server.findOne({ id: msg.guild.id });
+            var pos = serv.config.command_channels.indexOf(num);
 
             if (pos != -1) {
-                channels[pos] = num;
-                await setConfig(msg, comp, channels);
+                serv.config.command_channels.splice(pos, 1);
+                await serv.save();
                 msg.channel.send(`${num} was removed from whitelisted command channels.`);
                 return;
             }
-            channels[channels.length] = num;
-            await setConfig(msg, comp, channels);
+            serv.config.command_channels.push(num);
+            await serv.save();
             msg.channel.send(`${num} was added to whitelisted command channels.`);
             return;
         }
