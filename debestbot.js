@@ -180,7 +180,7 @@ async function getTopUsers(msg, cat, num) {
     }
 
     for (let c = 0; c < topcut.length; c++) {
-        if ((topcut[c].results.wins + topcut[c].results.losses) < 5) {
+        if ((topcut[c].results.wins + topcut[c].results.losses) < 3) {
             topcut.splice(c, 1);
             c--;
         } else {
@@ -261,6 +261,22 @@ client.on("ready", () => {
 // Called automatically when client receives a message from discord
 client.on("message", async msg => {
     if (msg.system || msg.author.bot) return;
+
+    if (msg.content.includes("nj") || msg.content.includes("nightjungle") || msg.content.includes("night jungle") || msg.content.includes("gaios") || msg.content.includes("rokah")) {
+        await msg.react("🇨");
+        await msg.react("🇷");
+        await msg.react("🇮");
+        await msg.react("🇳");
+        await msg.react("🇬");
+        await msg.react("🇪");
+    } else if (msg.content.includes("kirohh") || msg.content.includes("oversoul")) {
+        await msg.react("🇧");
+        await msg.react("🇷");
+        await msg.react("🇺");
+        await msg.react("🇭");
+    } else if (msg.content.includes("zack") || msg.content.includes("zecc") || msg.content.includes("zacc") || msg.content.includes("zeck") || msg.content.includes("zec")) {
+        await msg.react("🏳️‍🌈");
+    }
 
     if (msg.guild === null) {
         if (msg.content.includes("de") || msg.author.tag === "DeRealDeal#0451") {
