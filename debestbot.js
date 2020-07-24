@@ -867,7 +867,7 @@ client.on("message", async msg => {
 
         if (!online) return;
 
-        msg.channel.send(`> :x: **This feature is currently glitchy and as such I have diabled it. Work will resume 7/31/20.**`);
+        msg.channel.send(`> :x: **This feature is currently glitchy and as such I have disabled it. Work will resume 7/31/20.**`);
         return;
 
 
