@@ -5,7 +5,7 @@
         "rating [username & tag]": "Retrieves the user's rating. Will enter the user into the database if not already.",
         "match <winner username & tag> <loser username & tag>": "Records the results of a match into the database. Will enter the user into the database if not already.",
         "winrate [username & tag]": "Retrieves the user's winrate. Will enter the user into the database if not already.",
-        "top ['rating' or 'winrate' (without quotation marks] [how many users to display]": "(CURRENTLY GLITCHY) Retrieves the top users from the category of choice (category will default to rating). The number of users to retrieve can also be specified (defaults to 10). NOTE: Only users who have played at least 3 games will show up.",
+        "top ['rating' or 'winrate' (without quotation marks] [how many users to display]": "Retrieves the top users from the category of choice (category will default to rating). The number of users to retrieve can also be specified (defaults to 10). NOTE: Only users who have played at least 3 games will show up.",
         "code": "Sends a link to the GitHub repo."
         },
     "secrets": {
