@@ -299,6 +299,11 @@ async function getTopUsers(msg, cat, num) {
             } else {
                 await msg.channel.send(`${Number(c) + 1}. ${topcut[c].tag}: (${cat}) ${(cat === "winrate") ? (await getWinRate(msg, topcut[c].tag)) : (await getRating(msg, topcut[c].tag))}${(cat === "winrate") ? "%" : ""}`);
             }
+
+            if (topcut.length === 0) {
+                msg.channel.send(`> It appears there are no users who meet the criteria for appearing on the top cut.`);
+                return;
+            }   
         }
     } catch (err) {
         console.log(err);
