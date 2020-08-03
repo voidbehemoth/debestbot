@@ -265,45 +265,41 @@ async function getWinRate(msg, user, win, loss) {
         var ab = await Promise.all([a, b]);
 
         // The Algorithm™
-        return 100 * (ab[0] / ((ab[0] + ab[1] === 0) ? 1 : (ab[0] + ab[1])));
+        return Number((100 * (ab[0] / ((ab[0] + ab[1] === 0) ? 1 : (ab[0] + ab[1])))).toFixed(2));
     } catch (err) {
         console.log(err);
         throw (`Unable to calculate WL ratio of ${user}!`);
     }
 }
 
+function NAgetWinRate(msg, user, win, loss) {
+    // The Algorithm™
+    return Number((100 * (win / ((win + loss === 0) ? 1 : (win + loss)))).toFixed(2));
+}
+
 async function getTopUsers(msg, cat, num) {
     try {
         if (cat != "rating" && cat != "winrate") return null;
+
+        console.log(num)
 
         const users = await getUsers(msg);
 
         const topcut = users;
 
-        await topcut.sort(async (a, b) => {
-            var v1 = (cat === "winrate") ? (getWinRate(msg, a.tag)) : a.rating;
-            var v2 = (cat === "winrate") ? (getWinRate(msg, b.tag)) : b.rating;
-
-            var v = await Promise.all([v1, v2])
-
-            console.log(v[0]);
-            console.log(v[1]);
-
-            return v[1] - v[0];
+        topcut.sort((a, b) => {
+            var v1 = (cat === "winrate") ? (NAgetWinRate(msg, a.tag, a.results.wins, a.results.losses)) : a.rating;
+            var v2 = (cat === "winrate") ? (NAgetWinRate(msg, b.tag, b.results.wins, b.results.losses)) : b.rating;
+            
+            return v2 - v1;
         });
 
-        if (topcut.length > num) {
-            while (topcut.length > num) {
-                topcut.pop();
-            }
-        }
-
-        for (let c = 0; c < topcut.length; c++) {
+        for (let c = 0; (c < topcut.length && c < num); c++) {
             if ((topcut[c].results.wins + topcut[c].results.losses) < 3) {
                 topcut.splice(c, 1);
                 c--;
             } else {
-                msg.channel.send(`${Number(c) + 1}. ${topcut[c].tag}: (${cat}) ${(cat === "winrate") ? (await getWinRate(msg, topcut[c].tag)) : (await getRating(msg, topcut[c].tag))}${(cat === "winrate") ? "%" : ""}`);
+                await msg.channel.send(`${Number(c) + 1}. ${topcut[c].tag}: (${cat}) ${(cat === "winrate") ? (await getWinRate(msg, topcut[c].tag)) : (await getRating(msg, topcut[c].tag))}${(cat === "winrate") ? "%" : ""}`);
             }
         }
     } catch (err) {
@@ -950,11 +946,7 @@ client.on("message", async msg => {
             msg.channel.send(`${comp} has been set to ${num}`);
         } else if (command === "top" && formatted(msg, args, 0, 2)) {
 
-            if (!online) return;
-
-            msg.channel.send(`> :x: **This feature is currently glitchy and as such I have disabled it. Work will resume 7/31/20.**`);
-            return;
-
+            if (!online) return;            
 
             if (args.length === 0) {
                 await getTopUsers(msg, "rating", 10);
