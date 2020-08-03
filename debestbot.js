@@ -281,8 +281,6 @@ async function getTopUsers(msg, cat, num) {
     try {
         if (cat != "rating" && cat != "winrate") return null;
 
-        console.log(num)
-
         const users = await getUsers(msg);
 
         const topcut = users;
