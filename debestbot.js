@@ -439,9 +439,7 @@ client.on("message", async msg => {
         }
 
         // Exits process if the user is a bot, is not in a server, is discord itself, or did not send the message with the designated prefix.
-        if (!msg.content.startsWith(prefix)) { 
-            return; 
-        } else {
+        if (!msg.content.startsWith(prefix)) {
             if (online) {
                 if (msg.content.startsWith("hi dad i'm")) {
                     const args = msg.content.split(/ +/);
@@ -450,12 +448,13 @@ client.on("message", async msg => {
                         args.shift();
                         args.shift();
 
-                        msg.channel.send(`hi ${args[3]} i'm dad`);
+                        msg.channel.send(`hi ${args.join(" ")} i'm dad`);
                         return;
                     } 
                 }
                 
-            }
+            } 
+            return; 
         }
 
         if (!(await Server.exists({
